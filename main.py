@@ -107,14 +107,14 @@ def deMorganLaw(str):
     return deMorgan_proposition
 
 
-def standardizeVariableScope(input_str):
-    propositions = input_str.split(" ")
+def standardizeVariableScope(str):
+    propositions = str.split(" ")
     propositions = list(filter(None, propositions))
     props = []
     # Find the normal variable
     normal = propositions[0]
     normal_var = next((char for char in normal if char.isalpha()), None)
-    current_char='a'
+    current_char='y'
     props.append(propositions[0])
     if normal_var:
         # Iterate over a copy of propositions to avoid modifying it while iterating
@@ -132,8 +132,102 @@ def standardizeVariableScope(input_str):
         standardizeVariable_proposition+=i +" "
     return standardizeVariable_proposition
 
+def prenex_form(str):
+    propositions=str.split(" ")
+    propositions = list(filter(None, propositions))
+    regRule=reg.compile(rf'[{FOR_ALL}{THERE_EXIST}]+[a-z]')
+    regRule2 = reg.compile(rf'(?:{NOT})?[a-z]+\([a-z]+\)')
 
+    propTemp=""
+    for proposition in propositions:
+        if regRule.findall(proposition):
+            matches = [(m.group(), m.start()) for m in reg.finditer(regRule, proposition)]
+            for match, index in matches:
+                propTemp+= match+ " "
+    for proposition in propositions:
+        if not regRule.findall(proposition) and  not regRule2.findall(proposition):
+            propTemp+= proposition +" "
+        if regRule2.findall(proposition):
+            matches = [(m.group(), m.start()) for m in reg.finditer(regRule2, proposition)]
+            for match, index in matches:
+                propTemp+= match+ " "
 
+    return propTemp
+
+def skolemization(str):
+    propositions = str.split(" ")
+    propositions = list(filter(None, propositions))
+    curr_char = 'A'
+    curr_func = "F"
+    prob_temp = ""
+    n = len(propositions)
+    proposition = 0 
+
+    while proposition < n:
+
+        if propositions[proposition][0] == THERE_EXIST :
+            param = propositions[proposition][1]
+            propositions.pop(proposition)
+            propositions.insert(proposition, "")
+            regRule2 = reg.compile(rf'(?:{NOT})?[a-z]+\({param}+\)')
+            for i in propositions:
+                if regRule2.findall(i):
+                    matches = [(m.group(), m.start()) for m in reg.finditer(regRule2, i)]
+                    for match, index in matches:
+                        index_of_match= propositions.index(match)
+                        propositions.pop(index_of_match)
+                        if match[0] == NOT:
+                            modified_match = match[:3] + curr_char + match[4:]
+                        else:
+                            modified_match = match[:2] + curr_char + match[3:]
+                        propositions.insert(index_of_match, modified_match)
+
+        elif  proposition <= n - 1 and propositions[proposition][0] == FOR_ALL and propositions[proposition+1][0] == THERE_EXIST:
+            param = propositions[proposition + 1][1]
+            prev_param = propositions[proposition][1]
+            propositions.pop(proposition + 1)
+            propositions.insert(proposition, "")
+            regRule2 = reg.compile(rf'(?:{NOT})?[a-z]+\({param}+\)')
+            
+            for i in propositions:
+                if regRule2.findall(i):
+                    matches = [(m.group(), m.start()) for m in reg.finditer(regRule2, i)]
+                    for match , index in matches:
+                        index_of_match= propositions.index(match)
+                        propositions.pop(index_of_match)
+                        if match[0] == NOT:
+                            modified_match = match[:3] + curr_func+"("+prev_param+")" + match[4:] + " "
+                        else:
+                            modified_match = match[:2] + curr_func+"("+prev_param+")" + match[3:] + " "
+                        propositions.insert(index_of_match, modified_match)
+
+        else:
+            prob_temp+=propositions[proposition]
+        proposition += 1
+        curr_char=chr(ord(curr_char) + 1)
+        
+    propositions = list(filter(None, propositions))
+    prob_temp = "" 
+    for i in propositions:
+        prob_temp += i + " "
+
+    return prob_temp
+
+    # ∀x P( x) ∨ Q(F ( x)) → P( x) ∨ Q(F ( x))
+def eliminateUniversalQuantifiers(str):
+    propositions = str.split(" ")
+    propositions = list(filter(None, propositions))
+    regRule=reg.compile(rf'[{FOR_ALL}]+[a-z]')
+    for i in propositions:
+        if regRule.findall(i):
+            matches = [(m.group(), m.start()) for m in reg.finditer(regRule, i)]
+            for match, index in matches:
+                index_of_match= propositions.index(match)
+                propositions.pop(index_of_match)
+    prob_temp = "" 
+    for i in propositions:
+        prob_temp += i + " "
+    return prob_temp
 
 def CNF(str):
     str = changingPropositionFormat(str)
@@ -145,6 +239,12 @@ def CNF(str):
     str = deMorganLaw(str)
     print(str)
     str = standardizeVariableScope(str)
+    print(str)
+    str = prenex_form(str)
+    print(str)
+    str = skolemization(str)
+    print(str)
+    str = eliminateUniversalQuantifiers(str)
     return str
 
 
